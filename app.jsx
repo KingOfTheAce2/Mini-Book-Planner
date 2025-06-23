@@ -93,7 +93,7 @@ function App() {
 
   function initializeStructure(type) {
     const base = structures[type];
-    const chapters = base.chapters.map(ch => ({
+    const processed = base.chapters.map(ch => ({
       ...ch,
       content: '',
       subpoints: Array.from({ length: 3 }, (_, i) => ({
@@ -107,6 +107,22 @@ function App() {
         }))
       }))
     }));
+    const intro = {
+      id: '0',
+      title: 'Introduction',
+      content: '',
+      subpoints: Array.from({ length: 3 }, (_, i) => ({
+        id: `0.${i + 1}`,
+        title: `Subpoint ${i + 1}`,
+        content: '',
+        paragraphs: Array.from({ length: 3 }, (_, j) => ({
+          id: `0.${i + 1}.${j + 1}`,
+          title: `Paragraph ${j + 1}`,
+          content: ''
+        }))
+      }))
+    };
+    const chapters = [intro, ...processed];
     setMinibook(b => ({ ...b, structure: type, chapters }));
     setSelectedItem(null);
   }
@@ -408,7 +424,8 @@ function App() {
   return (
     <div className="container">
       <div className="header">
-        <h1>Minibook Planner <span className="credit">based on Chris Stanley's work</span></h1>
+        <h1>Mini Book Planner</h1>
+        <div className="credit">based on Chris Stanley's work</div>
 
         <div className="title-inputs">
           <input className="title-input" placeholder="Book Title" value={minibook.title}
@@ -417,13 +434,26 @@ function App() {
             onChange={e => setMinibook(b => ({ ...b, subtitle: e.target.value }))} />
         </div>
 
-      <div className="controls">
-        <select value={minibook.structure} onChange={e => initializeStructure(e.target.value)}>
-          <option value="sm">Select model...</option>
-          <option value="ws">W's Outline</option>
-          <option value="sequential">Sequential</option>
-          <option value="problems">10 Problems</option>
-        </select>
+        <div className="outline-length">
+          <label style={{ fontWeight: 600 }}>Outline Selector:</label>
+          <select value={minibook.structure} onChange={e => initializeStructure(e.target.value)}>
+            <option value="sm">Select model...</option>
+            <option value="ws">W's Outline</option>
+            <option value="sequential">Sequential</option>
+            <option value="problems">10 Problems</option>
+          </select>
+
+          <label style={{ fontWeight: 600 }}>Mini Book Length:</label>
+          <select value={lengthMode} onChange={e => setLengthMode(e.target.value)}>
+            {Object.entries(lengthGoals).map(([key, cfg]) => (
+              <option key={key} value={key}>
+                {`${cfg.name}: ${cfg.pages[0]}–${cfg.pages[1]} pages/chapter`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="controls">
 
         <input
           type="text"
@@ -452,29 +482,18 @@ function App() {
           </button>
         </div>
 
-        <div style={{ marginTop: 20, textAlign: 'center' }}>
-          <label style={{ fontWeight: 600 }}>✍️ Mini Book Length:</label>
-          <select value={lengthMode} onChange={e => setLengthMode(e.target.value)} style={{ marginLeft: 8 }}>
-            {Object.entries(lengthGoals).map(([key, cfg]) => (
-              <option key={key} value={key}>
-                {`${cfg.name}: ${cfg.pages[0]}–${cfg.pages[1]} pages/chapter`}
-              </option>
-            ))}
-          </select>
-
-          <div style={{ marginTop: 8 }}>
-            <strong>Total words:</strong> {getTotalWordCount()} / Goal: {minibook.chapters.length * getGoalWordsPerChapter()}
-            <div style={{ marginTop: 4, height: 10, background: '#eee', borderRadius: 4 }}>
-              <div style={{
-                height: '100%',
-                background: getProgressColor((getTotalWordCount() / (minibook.chapters.length * getGoalWordsPerChapter())) * 100),
-                width: `${Math.min(100, (getTotalWordCount() / (minibook.chapters.length * getGoalWordsPerChapter())) * 100)}%`,
-                borderRadius: 4
-              }}></div>
-            </div>
-            <div style={{ marginTop: 4 }}>
-              <strong>Estimated reading:</strong> {getReadingTime()} min
-            </div>
+        <div className="stats">
+          <strong>Total words:</strong> {getTotalWordCount()} / Goal: {minibook.chapters.length * getGoalWordsPerChapter()}
+          <div className="progress-container">
+            <div style={{
+              height: '100%',
+              background: getProgressColor((getTotalWordCount() / (minibook.chapters.length * getGoalWordsPerChapter())) * 100),
+              width: `${Math.min(100, (getTotalWordCount() / (minibook.chapters.length * getGoalWordsPerChapter())) * 100)}%`,
+              borderRadius: 4
+            }}></div>
+          </div>
+          <div style={{ marginTop: 4 }}>
+            <strong>Estimated reading:</strong> {getReadingTime()} min
           </div>
         </div>
       </div>
