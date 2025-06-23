@@ -15,6 +15,12 @@ function App() {
     chapters: []
   });
   const [selectedItem, setSelectedItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
+
+  React.useEffect(() => {
+    document.body.classList.toggle('dark', darkMode);
+  }, [darkMode]);
 
   const lengthGoals = {
     mini: { name: 'Mini', wordsPerPage: 250, pages: [1, 2] },
@@ -43,6 +49,10 @@ function App() {
       });
       return acc + w;
     }, 0);
+  }
+
+  function getReadingTime() {
+    return Math.ceil(getTotalWordCount() / 200);
   }
 
   function getProgressColor(pct) {
@@ -127,6 +137,76 @@ function App() {
       }
       return copy;
     });
+  }
+
+  function addSubpoint(ch) {
+    setMinibook(b => {
+      const copy = { ...b };
+      const sp = copy.chapters[ch].subpoints;
+      const id = `${copy.chapters[ch].id}.${sp.length + 1}`;
+      sp.push({ id, title: `Subpoint ${sp.length + 1}`, content: '', paragraphs: [] });
+      return copy;
+    });
+  }
+
+  function removeSubpoint(ch, s) {
+    setMinibook(b => {
+      const copy = { ...b };
+      copy.chapters[ch].subpoints.splice(s, 1);
+      return copy;
+    });
+    setSelectedItem(null);
+  }
+
+  function addParagraph(ch, s) {
+    setMinibook(b => {
+      const copy = { ...b };
+      const ps = copy.chapters[ch].subpoints[s].paragraphs;
+      const id = `${copy.chapters[ch].subpoints[s].id}.${ps.length + 1}`;
+      ps.push({ id, title: `Paragraph ${ps.length + 1}`, content: '' });
+      return copy;
+    });
+  }
+
+  function removeParagraph(ch, s, p) {
+    setMinibook(b => {
+      const copy = { ...b };
+      copy.chapters[ch].subpoints[s].paragraphs.splice(p, 1);
+      return copy;
+    });
+    setSelectedItem(null);
+  }
+
+  function getAllPaths() {
+    const paths = [];
+    minibook.chapters.forEach((ch, i) => {
+      paths.push(`chapters.${i}`);
+      ch.subpoints.forEach((sp, j) => {
+        paths.push(`chapters.${i}.subpoints.${j}`);
+        sp.paragraphs.forEach((p, k) => {
+          paths.push(`chapters.${i}.subpoints.${j}.paragraphs.${k}`);
+        });
+      });
+    });
+    return paths;
+  }
+
+  function selectNext() {
+    const paths = getAllPaths();
+    if (!selectedItem) return;
+    const idx = paths.indexOf(selectedItem.path);
+    if (idx >= 0 && idx < paths.length - 1) {
+      setSelectedItem({ item: null, path: paths[idx + 1] });
+    }
+  }
+
+  function selectPrev() {
+    const paths = getAllPaths();
+    if (!selectedItem) return;
+    const idx = paths.indexOf(selectedItem.path);
+    if (idx > 0) {
+      setSelectedItem({ item: null, path: paths[idx - 1] });
+    }
   }
 
   function exportToMarkdown() {
@@ -269,6 +349,10 @@ function App() {
     const [open, setOpen] = useState(true);
     const hasKids = (item.subpoints?.length || item.paragraphs?.length) > 0;
     const isSel = selectedItem?.path === path;
+    const pObj = getPathObject(path);
+    const match = searchTerm &&
+      (item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       (item.content || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
       <div style={{ marginLeft: level * 16 }}>
@@ -278,7 +362,7 @@ function App() {
             display: 'flex',
             alignItems: 'center',
             padding: 4,
-            background: isSel ? '#ebf5ff' : undefined,
+            background: isSel ? '#ebf5ff' : match ? '#fff7d6' : undefined,
             borderLeft: isSel ? '4px solid #3b82f6' : undefined,
             cursor: 'pointer'
           }}
@@ -294,6 +378,18 @@ function App() {
           <span style={{ fontSize: 12, fontWeight: 500 }}>
             {item.id} {item.title}
           </span>
+          {pObj.type === 'chapter' && (
+            <button onClick={e => { e.stopPropagation(); addSubpoint(pObj.c); }} style={{ marginLeft: 4 }}>+Sub</button>
+          )}
+          {pObj.type === 'subpoint' && (
+            <>
+              <button onClick={e => { e.stopPropagation(); addParagraph(pObj.c, pObj.s); }} style={{ marginLeft: 4 }}>+Para</button>
+              <button onClick={e => { e.stopPropagation(); removeSubpoint(pObj.c, pObj.s); }} style={{ marginLeft: 2 }}>✕</button>
+            </>
+          )}
+          {pObj.type === 'paragraph' && (
+            <button onClick={e => { e.stopPropagation(); removeParagraph(pObj.c, pObj.s, pObj.p); }} style={{ marginLeft: 4 }}>✕</button>
+          )}
         </div>
         {open && hasKids && (
           <>
@@ -321,13 +417,30 @@ function App() {
             onChange={e => setMinibook(b => ({ ...b, subtitle: e.target.value }))} />
         </div>
 
-        <div className="controls">
-          <select value={minibook.structure} onChange={e => initializeStructure(e.target.value)}>
-            <option value="sm">Select model...</option>
-            <option value="ws">W's Outline</option>
-            <option value="sequential">Sequential</option>
-            <option value="problems">10 Problems</option>
-          </select>
+      <div className="controls">
+        <select value={minibook.structure} onChange={e => initializeStructure(e.target.value)}>
+          <option value="sm">Select model...</option>
+          <option value="ws">W's Outline</option>
+          <option value="sequential">Sequential</option>
+          <option value="problems">10 Problems</option>
+        </select>
+
+        <input
+          type="text"
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          style={{ flex: 1 }}
+        />
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input
+            type="checkbox"
+            checked={darkMode}
+            onChange={e => setDarkMode(e.target.checked)}
+          />
+          Dark
+        </label>
 
           <label className="import-btn">
             <Upload /> Import
@@ -358,6 +471,9 @@ function App() {
                 width: `${Math.min(100, (getTotalWordCount() / (minibook.chapters.length * getGoalWordsPerChapter())) * 100)}%`,
                 borderRadius: 4
               }}></div>
+            </div>
+            <div style={{ marginTop: 4 }}>
+              <strong>Estimated reading:</strong> {getReadingTime()} min
             </div>
           </div>
         </div>
@@ -392,7 +508,11 @@ function App() {
                 onChange={e => updateContent(getPathObject(selectedItem.path), e.target.value)}
               />
               <p style={{ fontSize: 13, marginTop: 8 }}>
-                <strong>Words:</strong> {countWords(getCurrentContent())} / Goal: {getGoalWordsPerChapter()}
+                <strong>Words:</strong> {countWords(getCurrentContent())} / Goal: {getGoalWordsPerChapter()} |
+                <strong> Chars:</strong> {getCurrentContent().length}
+              </p>
+              <p style={{ fontSize: 13 }}>
+                <strong>Reading time:</strong> {getReadingTime()} min
               </p>
               <div style={{ marginTop: 4, height: 8, background: '#eee', borderRadius: 4 }}>
                 <div style={{
@@ -401,6 +521,10 @@ function App() {
                   width: `${Math.min(100, (countWords(getCurrentContent()) / getGoalWordsPerChapter()) * 100)}%`,
                   borderRadius: 4
                 }}></div>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <button onClick={selectPrev} style={{ marginRight: 4 }}>Prev</button>
+                <button onClick={selectNext}>Next</button>
               </div>
             </>
           ) : (
